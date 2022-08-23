@@ -48,29 +48,39 @@ func LineBotInit(userid string, text string) {
 		log.Println(err)
 	}
 
-	rand.Seed(time.Now().UnixNano())
-
-	recommendationAttraction := GetTaipeiAttraction(rand.Intn(16))
-
-	PushMessage(userid, bot, recommendationAttraction)
+	PushMessage(userid, bot, text)
 
 }
 
-func PushMessage(userid string, bot *linebot.Client, recommendationAttraction string) {
+func PushMessage(userid string, bot *linebot.Client, text string) {
+
+	if text == "night" && userid == "U2259177e62ca35c733743cbf42a50876" {
+		if _, err := bot.PushMessage(`U974a81e8995bb6d231cc06a749e7ddbf`, linebot.NewTextMessage("寶寶晚安")).Do(); err != nil {
+			log.Println(err)
+		}
+		if _, err := bot.PushMessage(userid, linebot.NewStickerMessage("6362", "11087943")).Do(); err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
+	if text == "love" && userid == "U2259177e62ca35c733743cbf42a50876" {
+		if _, err := bot.PushMessage(`U974a81e8995bb6d231cc06a749e7ddbf`, linebot.NewTextMessage("寶寶我愛你")).Do(); err != nil {
+			log.Println(err)
+		}
+		if _, err := bot.PushMessage(userid, linebot.NewStickerMessage("11538", "51626502")).Do(); err != nil {
+			log.Println(err)
+		}
+		return
+	}
+
+	rand.Seed(time.Now().UnixNano())
+	recommendationAttraction := GetTaipeiAttraction(rand.Intn(16))
 
 	if _, err := bot.PushMessage(userid, linebot.NewTextMessage(recommendationAttraction)).Do(); err != nil {
 		log.Println(err)
 	}
 
-	if userid == `U974a81e8995bb6d231cc06a749e7ddbf` {
-		if _, err := bot.PushMessage(userid, linebot.NewTextMessage("寶寶我愛妳喔")).Do(); err != nil {
-			log.Println(err)
-		}
-
-		if _, err := bot.PushMessage(userid, linebot.NewStickerMessage("11538", "51626502")).Do(); err != nil {
-			log.Println(err)
-		}
-	}
 }
 
 func GetTaipeiAttraction(page int) string {
