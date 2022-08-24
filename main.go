@@ -11,6 +11,7 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -28,7 +29,10 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		RequestBody: body,
 	}
 
-	json.Unmarshal([]byte(res.RequestBody), &event)
+	jsonErr := json.Unmarshal([]byte(res.RequestBody), &event)
+	if jsonErr != nil {
+		return events.APIGatewayProxyResponse{}, jsonErr
+	}
 
 	userid := fmt.Sprintf("%v", event.Events[0].Source.UserID)
 	text := fmt.Sprintf("%v", event.Events[0].Message.Text)
@@ -43,7 +47,7 @@ func LineBotInit(userid string, text string) {
 
 	client := &http.Client{}
 
-	bot, err := linebot.New(`a1c7ddc08b78297946ab4b7731c19ce5`, `6fwhdTxYdM+4DgaflnZ5PBRzxmx5b3MlNZcBQoYfP0UokaeHwSQHg8eHi6QCXaOD7pAgErYafbhgvBJbtipX7yTqe8LXV28LWu6B+Tg+SDd4yMxXve0wxja/15W7wQPiF8eYorcCPFuebz0nV5H2+QdB04t89/1O/w1cDnyilFU=`, linebot.WithHTTPClient(client))
+	bot, err := linebot.New(os.Getenv("channelSecret"), os.Getenv("channelToken"), linebot.WithHTTPClient(client))
 	if err != nil {
 		log.Println(err)
 	}
@@ -54,21 +58,21 @@ func LineBotInit(userid string, text string) {
 
 func PushMessage(userid string, bot *linebot.Client, text string) {
 
-	if text == "night" && userid == "U2259177e62ca35c733743cbf42a50876" {
-		if _, err := bot.PushMessage(`U974a81e8995bb6d231cc06a749e7ddbf`, linebot.NewTextMessage("寶寶晚安")).Do(); err != nil {
+	if text == "night" && userid == os.Getenv("myUserID") {
+		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewTextMessage("寶寶晚安")).Do(); err != nil {
 			log.Println(err)
 		}
-		if _, err := bot.PushMessage(userid, linebot.NewStickerMessage("6362", "11087943")).Do(); err != nil {
+		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewStickerMessage("6362", "11087943")).Do(); err != nil {
 			log.Println(err)
 		}
 		return
 	}
 
-	if text == "love" && userid == "U2259177e62ca35c733743cbf42a50876" {
-		if _, err := bot.PushMessage(`U974a81e8995bb6d231cc06a749e7ddbf`, linebot.NewTextMessage("寶寶我愛你")).Do(); err != nil {
+	if text == "love" && userid == os.Getenv("myUserID") {
+		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewTextMessage("寶寶我愛你")).Do(); err != nil {
 			log.Println(err)
 		}
-		if _, err := bot.PushMessage(userid, linebot.NewStickerMessage("11538", "51626502")).Do(); err != nil {
+		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewStickerMessage("11538", "51626502")).Do(); err != nil {
 			log.Println(err)
 		}
 		return
@@ -87,11 +91,11 @@ func GetTaipeiAttraction(page int) string {
 
 	client := &http.Client{}
 
-	var str_build strings.Builder
-	str_build.WriteString("https://www.travel.taipei/open-api/zh-tw/Attractions/All?page=")
-	str_build.WriteString(strconv.Itoa(page))
+	var strBuild strings.Builder
+	strBuild.WriteString("https://www.travel.taipei/open-api/zh-tw/Attractions/All?page=")
+	strBuild.WriteString(strconv.Itoa(page))
 
-	url := str_build.String()
+	url := strBuild.String()
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
@@ -107,13 +111,26 @@ func GetTaipeiAttraction(page int) string {
 	}
 
 	body, err := ioutil.ReadAll(resp.Body)
+
+	closeErr := resp.Body.Close()
+
+	if closeErr != nil {
+		fmt.Println(err)
+		return "Please Wait..."
+	}
+
 	if err != nil {
 		fmt.Println(err)
 		return "Please Wait..."
 	}
+
 	var attraction ApiModel.Attractions
 
-	json.Unmarshal(body, &attraction)
+	jsonErr := json.Unmarshal(body, &attraction)
+	if jsonErr != nil {
+		fmt.Println(err)
+		return "Please Wait..."
+	}
 
 	rand.Seed(time.Now().UnixNano())
 
