@@ -4,16 +4,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/YOUR-USER-OR-ORG-NAME/go_line/ApiModel"
+	"github.com/YOUR-USER-OR-ORG-NAME/go_line/Service"
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/line/line-bot-sdk-go/v7/linebot"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -34,16 +32,13 @@ func handler(request events.APIGatewayProxyRequest) (events.APIGatewayProxyRespo
 		return events.APIGatewayProxyResponse{}, jsonErr
 	}
 
-	userid := fmt.Sprintf("%v", event.Events[0].Source.UserID)
-	text := fmt.Sprintf("%v", event.Events[0].Message.Text)
-
-	LineBotInit(userid, text)
+	LineBotInit(event)
 
 	return events.APIGatewayProxyResponse{Body: request.Body, StatusCode: 200}, nil
 
 }
 
-func LineBotInit(userid string, text string) {
+func LineBotInit(event ApiModel.Event) {
 
 	client := &http.Client{}
 
@@ -52,89 +47,49 @@ func LineBotInit(userid string, text string) {
 		log.Println(err)
 	}
 
-	PushMessage(userid, bot, text)
+	userid := fmt.Sprintf("%v", event.Events[0].Source.UserID)
+	text := fmt.Sprintf("%v", event.Events[0].Message.Text)
 
-}
+	rand.Seed(time.Now().UnixNano())
+	attractionData := Service.GetTaipeiAttraction(rand.Intn(16))
 
-func PushMessage(userid string, bot *linebot.Client, text string) {
-
-	if text == "night" && userid == os.Getenv("myUserID") {
-		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewTextMessage("寶寶晚安")).Do(); err != nil {
-			log.Println(err)
-		}
-		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewStickerMessage("6362", "11087943")).Do(); err != nil {
-			log.Println(err)
-		}
+	if attractionData.Name == "" {
+		log.Println("No Data")
 		return
 	}
 
-	if text == "love" && userid == os.Getenv("myUserID") {
-		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewTextMessage("寶寶我愛你")).Do(); err != nil {
-			log.Println(err)
-		}
-		if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewStickerMessage("11538", "51626502")).Do(); err != nil {
-			log.Println(err)
-		}
-		return
-	}
-
-	rand.Seed(time.Now().UnixNano())
-	recommendationAttraction := GetTaipeiAttraction(rand.Intn(16))
-
-	if _, err := bot.PushMessage(userid, linebot.NewTextMessage(recommendationAttraction)).Do(); err != nil {
-		log.Println(err)
-	}
+	PushMessage(userid, bot, text, attractionData)
 
 }
 
-func GetTaipeiAttraction(page int) string {
+func PushMessage(userid string, bot *linebot.Client, text string, attractionDetail ApiModel.AttractionDetail) {
 
-	client := &http.Client{}
+	if userid != os.Getenv("yuUserID") {
+		if text == "night" {
+			if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewTextMessage("寶寶晚安")).Do(); err != nil {
+				log.Println(err)
+			}
+			if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewStickerMessage("6362", "11087943")).Do(); err != nil {
+				log.Println(err)
+			}
+			return
+		}
 
-	var strBuild strings.Builder
-	strBuild.WriteString("https://www.travel.taipei/open-api/zh-tw/Attractions/All?page=")
-	strBuild.WriteString(strconv.Itoa(page))
+		if text == "love" {
+			if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewTextMessage("寶寶我愛你")).Do(); err != nil {
+				log.Println(err)
+			}
+			if _, err := bot.PushMessage(os.Getenv("yuUserID"), linebot.NewStickerMessage("11538", "51626502")).Do(); err != nil {
+				log.Println(err)
+			}
+			return
+		}
+	}
 
-	url := strBuild.String()
+	message := fmt.Sprintf("%s  %s", attractionDetail.Name, "Map: "+attractionDetail.URL)
 
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
+	if _, err := bot.PushMessage(userid, linebot.NewTextMessage(message)).Do(); err != nil {
 		log.Println(err)
-		return "Please Wait..."
 	}
 
-	req.Header.Add("Accept", "application/json")
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Println(err)
-		return "Please Wait..."
-	}
-
-	body, err := ioutil.ReadAll(resp.Body)
-
-	closeErr := resp.Body.Close()
-
-	if closeErr != nil {
-		fmt.Println(err)
-		return "Please Wait..."
-	}
-
-	if err != nil {
-		fmt.Println(err)
-		return "Please Wait..."
-	}
-
-	var attraction ApiModel.Attractions
-
-	jsonErr := json.Unmarshal(body, &attraction)
-	if jsonErr != nil {
-		fmt.Println(err)
-		return "Please Wait..."
-	}
-
-	rand.Seed(time.Now().UnixNano())
-
-	randomIndex := rand.Intn(31)
-
-	return attraction.Data[randomIndex].Name
 }
